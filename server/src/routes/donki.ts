@@ -29,6 +29,10 @@ export type SpaceWeatherEvent = {
   type: "Solar Flare" | "CME" | "Geomagnetic Storm";
   time: string;
   headline: string;
+  /** Solar flares only: the X-ray class, e.g. "M2.3" or "X1.0". */
+  flareClass?: string;
+  /** Geomagnetic storms only: the highest Kp index observed during the storm. */
+  kp?: number;
 };
 
 /**
@@ -51,29 +55,32 @@ donkiRouter.get("/", async (req, res) => {
       ]);
 
       const merged: SpaceWeatherEvent[] = [
-        ...flares.map((f) => ({
+        ...flares.map((f): SpaceWeatherEvent => ({
           id: f.flrID,
-          type: "Solar Flare" as const,
+          type: "Solar Flare",
           time: f.peakTime ?? f.beginTime,
           headline: `${f.classType ?? "Unclassified"} flare${
             f.sourceLocation ? ` at ${f.sourceLocation}` : ""
           }`,
+          // Passed through as its own field so the client can rank flares
+          // and show a severity badge without parsing the headline text.
+          ...(f.classType ? { flareClass: f.classType } : {}),
         })),
-        ...cmes.map((c) => ({
+        ...cmes.map((c): SpaceWeatherEvent => ({
           id: c.activityID,
-          type: "CME" as const,
+          type: "CME",
           time: c.startTime,
           headline: c.note?.slice(0, 140) || "Coronal mass ejection observed",
         })),
-        ...storms.map((s) => {
-          const maxKp = s.allKpIndex?.length
-            ? Math.max(...s.allKpIndex.map((k) => k.kpIndex))
-            : null;
+        ...storms.map((s): SpaceWeatherEvent => {
+          const kpValues = (s.allKpIndex ?? []).map((k) => Number(k.kpIndex)).filter(Number.isFinite);
+          const maxKp = kpValues.length ? Math.max(...kpValues) : null;
           return {
             id: s.gstID,
-            type: "Geomagnetic Storm" as const,
+            type: "Geomagnetic Storm",
             time: s.startTime,
             headline: maxKp !== null ? `Peak Kp index ${maxKp}` : "Geomagnetic storm observed",
+            ...(maxKp !== null ? { kp: maxKp } : {}),
           };
         }),
       ];

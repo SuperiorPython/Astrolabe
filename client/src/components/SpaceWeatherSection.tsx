@@ -1,17 +1,12 @@
 import { useMemo } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api, type SpaceWeatherEvent } from "../lib/api";
 import { useFetch } from "../lib/useFetch";
 import { formatDateTime, formatShortDay, isoDay, lastNDays } from "../lib/format";
+import { Panel } from "./Panel";
+import { SectionHead } from "./SectionHead";
+import { Skeleton } from "./Skeleton";
+import { StatStrip, StatStripSkeleton, type StatItem, type StatTone } from "./StatStrip";
 
 const DAYS = 30;
 const MAX_FEED_ITEMS = 60;
@@ -32,6 +27,76 @@ interface DayBucket {
   CME: number;
   "Geomagnetic Storm": number;
 }
+
+// ---------------------------------------------------------------------------
+// Severity
+//
+// Flares are ranked by their X-ray class (A < B < C < M < X, then the number
+// after the letter). Geomagnetic storms use NOAA's G-scale, which is defined
+// from the Kp index: Kp 5 = G1 (minor) up to Kp 9 = G5 (extreme). Kp values
+// come in thirds (4.67 is written "5-"), so the level uses the rounded Kp.
+// ---------------------------------------------------------------------------
+
+type Severity = "minor" | "moderate" | "major";
+
+const FLARE_LETTER_RANK: Record<string, number> = { A: 1, B: 2, C: 3, M: 4, X: 5 };
+
+interface ParsedFlare {
+  letter: string;
+  value: number;
+  /** Comparable score: higher is stronger. */
+  score: number;
+}
+
+function parseFlare(flareClass: string | undefined): ParsedFlare | null {
+  if (!flareClass) return null;
+  const match = /^([ABCMX])\s*([0-9]+(?:\.[0-9]+)?)?/i.exec(flareClass.trim());
+  if (!match) return null;
+  const letter = match[1].toUpperCase();
+  const value = match[2] ? Number(match[2]) : 0;
+  return { letter, value, score: FLARE_LETTER_RANK[letter] * 1000 + value };
+}
+
+function flareSeverity(letter: string): Severity {
+  if (letter === "X") return "major";
+  if (letter === "M") return "moderate";
+  return "minor";
+}
+
+/** NOAA G-scale level (1–5) for a Kp value, or 0 if it's below storm level. */
+function gLevel(kp: number): number {
+  return Math.max(0, Math.min(5, Math.round(kp) - 4));
+}
+
+function stormSeverity(g: number): Severity {
+  if (g >= 3) return "major";
+  if (g === 2) return "moderate";
+  return "minor";
+}
+
+const G_NAMES = ["", "minor", "moderate", "strong", "severe", "extreme"];
+
+function severityTone(severity: Severity): StatTone {
+  return severity === "major" ? "critical" : severity === "moderate" ? "warn" : "ok";
+}
+
+/** Severity pill shown on feed items that have a measurable size. */
+function severityBadge(event: SpaceWeatherEvent): { label: string; severity: Severity } | null {
+  if (event.type === "Solar Flare") {
+    const flare = parseFlare(event.flareClass);
+    if (!flare) return null;
+    return { label: event.flareClass as string, severity: flareSeverity(flare.letter) };
+  }
+  if (event.type === "Geomagnetic Storm" && event.kp !== undefined) {
+    const g = gLevel(event.kp);
+    return { label: g > 0 ? `G${g} · Kp ${event.kp}` : `Kp ${event.kp}`, severity: stormSeverity(g) };
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Chart pieces
+// ---------------------------------------------------------------------------
 
 /**
  * Renders one stacked-bar segment, inset 1px top and bottom so touching
@@ -103,8 +168,91 @@ function WeatherTooltip({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Headline stats
+// ---------------------------------------------------------------------------
+
+function buildStats(events: SpaceWeatherEvent[], dailyCounts: DayBucket[]): StatItem[] {
+  // Strongest flare in the window.
+  let strongest: { event: SpaceWeatherEvent; flare: ParsedFlare } | null = null;
+  for (const event of events) {
+    if (event.type !== "Solar Flare") continue;
+    const flare = parseFlare(event.flareClass);
+    if (flare && (!strongest || flare.score > strongest.flare.score)) strongest = { event, flare };
+  }
+
+  // Highest Kp in the window.
+  let peakStorm: SpaceWeatherEvent | null = null;
+  for (const event of events) {
+    if (event.type === "Geomagnetic Storm" && event.kp !== undefined) {
+      if (!peakStorm || event.kp > (peakStorm.kp as number)) peakStorm = event;
+    }
+  }
+
+  const counts = { flares: 0, cmes: 0, storms: 0 };
+  for (const event of events) {
+    if (event.type === "Solar Flare") counts.flares += 1;
+    else if (event.type === "CME") counts.cmes += 1;
+    else counts.storms += 1;
+  }
+
+  const busiest = dailyCounts.reduce(
+    (best, day) => {
+      const n = day["Solar Flare"] + day.CME + day["Geomagnetic Storm"];
+      return n > best.n ? { date: day.date, n } : best;
+    },
+    { date: "", n: 0 }
+  );
+
+  const stats: StatItem[] = [];
+
+  if (strongest) {
+    stats.push({
+      label: "Strongest flare",
+      value: strongest.event.flareClass as string,
+      hint: formatDateTime(strongest.event.time),
+      tone: severityTone(flareSeverity(strongest.flare.letter)),
+    });
+  } else {
+    stats.push({ label: "Strongest flare", value: "—", hint: "none classified in this window" });
+  }
+
+  if (peakStorm) {
+    const g = gLevel(peakStorm.kp as number);
+    stats.push({
+      label: "Peak Kp index",
+      value: String(peakStorm.kp),
+      hint: g > 0 ? `G${g} · ${G_NAMES[g]} storm` : "below storm level",
+      tone: g > 0 ? severityTone(stormSeverity(g)) : "ok",
+    });
+  } else {
+    stats.push({ label: "Peak Kp index", value: "—", hint: "no geomagnetic storms" });
+  }
+
+  stats.push({
+    label: `Events · ${DAYS} days`,
+    value: events.length.toLocaleString(),
+    hint: `${counts.flares} flares · ${counts.cmes} CMEs · ${counts.storms} storms`,
+    tone: "accent",
+  });
+
+  stats.push(
+    busiest.n > 0
+      ? { label: "Busiest day", value: formatShortDay(busiest.date), hint: `${busiest.n} events` }
+      : { label: "Busiest day", value: "—", hint: "no events" }
+  );
+
+  return stats;
+}
+
+// ---------------------------------------------------------------------------
+// Section
+// ---------------------------------------------------------------------------
+
 export function SpaceWeatherSection() {
   const state = useFetch(() => api.getSpaceWeather(DAYS), []);
+
+  const events = useMemo<SpaceWeatherEvent[]>(() => (state.status === "success" ? state.data : []), [state]);
 
   const dailyCounts = useMemo<DayBucket[]>(() => {
     const days = lastNDays(DAYS);
@@ -112,111 +260,141 @@ export function SpaceWeatherSection() {
       days.map((date) => [date, { date, "Solar Flare": 0, CME: 0, "Geomagnetic Storm": 0 }])
     );
 
-    if (state.status === "success") {
-      for (const event of state.data) {
-        const day = isoDay(new Date(event.time));
-        const bucket = buckets.get(day);
-        if (bucket) bucket[event.type] += 1;
-      }
+    for (const event of events) {
+      const day = isoDay(new Date(event.time));
+      const bucket = buckets.get(day);
+      if (bucket) bucket[event.type] += 1;
     }
 
     return days.map((d) => buckets.get(d)!);
-  }, [state]);
+  }, [events]);
 
-  const feed = useMemo<SpaceWeatherEvent[]>(() => {
-    if (state.status !== "success") return [];
-    return [...state.data]
-      .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
-      .slice(0, MAX_FEED_ITEMS);
-  }, [state]);
+  const feed = useMemo<SpaceWeatherEvent[]>(
+    () =>
+      [...events]
+        .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+        .slice(0, MAX_FEED_ITEMS),
+    [events]
+  );
 
-  const totalEvents = state.status === "success" ? state.data.length : 0;
+  const totalEvents = events.length;
 
   return (
     <section className="section">
-      <h2>Space weather (last {DAYS} days)</h2>
+      <SectionHead
+        title={`Space weather (last ${DAYS} days)`}
+        source="NASA · DONKI"
+        status={state.status}
+        updatedAt={state.status === "success" ? state.updatedAt : undefined}
+      />
 
-      {state.status === "loading" && <p className="muted">Loading DONKI feed…</p>}
+      {state.status === "loading" && (
+        <div className="exoplanets-layout">
+          <StatStripSkeleton count={4} />
+          <Skeleton height="420px" />
+        </div>
+      )}
       {state.status === "error" && (
         <p className="error">Couldn't load space weather data: {state.message}</p>
       )}
 
       {state.status === "success" && (
         <div className="exoplanets-layout">
-          <div className="chart-card">
-            <h3>{totalEvents.toLocaleString()} events by day</h3>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={dailyCounts} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
-                <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tickFormatter={formatShortDay}
-                  interval={Math.ceil(DAYS / 10)}
-                  tick={{ fill: "var(--chart-axis)", fontSize: 12 }}
-                  stroke="var(--chart-grid)"
-                />
-                <YAxis
-                  allowDecimals={false}
-                  tick={{ fill: "var(--chart-axis)", fontSize: 12 }}
-                  stroke="var(--chart-grid)"
-                  width={28}
-                />
-                <Tooltip content={<WeatherTooltip />} cursor={{ fill: "var(--border)" }} />
-                <Legend
-                  wrapperStyle={{ color: "var(--text-muted)", fontSize: 12, paddingTop: 8 }}
-                  iconType="circle"
-                  iconSize={8}
-                />
-                <Bar
-                  dataKey="Solar Flare"
-                  stackId="events"
-                  barSize={16}
-                  isAnimationActive={false}
-                  shape={(p: object) => (
-                    <StackSegment {...p} fill={TYPE_COLOR["Solar Flare"]} roundTop={false} />
-                  )}
-                />
-                <Bar
-                  dataKey="CME"
-                  stackId="events"
-                  barSize={16}
-                  isAnimationActive={false}
-                  shape={(p: object) => <StackSegment {...p} fill={TYPE_COLOR.CME} roundTop={false} />}
-                />
-                <Bar
-                  dataKey="Geomagnetic Storm"
-                  stackId="events"
-                  barSize={16}
-                  isAnimationActive={false}
-                  shape={(p: object) => (
-                    <StackSegment {...p} fill={TYPE_COLOR["Geomagnetic Storm"]} roundTop={true} />
-                  )}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <StatStrip items={buildStats(events, dailyCounts)} />
 
-          <div>
-            <h3 className="feed-heading">Recent activity</h3>
-            <ul className="event-feed">
-              {feed.map((event: SpaceWeatherEvent) => (
-                <li key={event.id} className="event-item">
-                  <span className="type-dot" style={{ background: TYPE_COLOR[event.type] }} />
-                  <div className="event-item-body">
-                    <div className="event-item-headline">{event.headline}</div>
-                    <div className="muted event-item-meta">
-                      {event.type} · {formatDateTime(event.time)}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            {feed.length === 0 && <p className="muted">No space weather events in this window.</p>}
-            {totalEvents > MAX_FEED_ITEMS && (
+          <div className="wx-main">
+            <Panel title="Events by day" meta={`${totalEvents.toLocaleString()} events`}>
+              <div className="exo-legend">
+                {EVENT_TYPES.map((type) => (
+                  <span key={type}>
+                    <span className="type-dot" style={{ background: TYPE_COLOR[type] }} />
+                    {type}
+                  </span>
+                ))}
+              </div>
+              <ResponsiveContainer width="100%" height={340}>
+                <BarChart data={dailyCounts} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
+                  <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={formatShortDay}
+                    interval={Math.ceil(DAYS / 10)}
+                    tick={{ fill: "var(--chart-axis)", fontSize: 12 }}
+                    stroke="var(--chart-grid)"
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fill: "var(--chart-axis)", fontSize: 12 }}
+                    stroke="var(--chart-grid)"
+                    width={28}
+                  />
+                  <Tooltip content={<WeatherTooltip />} cursor={{ fill: "var(--border)" }} />
+                  <Bar
+                    dataKey="Solar Flare"
+                    stackId="events"
+                    barSize={16}
+                    isAnimationActive={false}
+                    shape={(p: object) => (
+                      <StackSegment {...p} fill={TYPE_COLOR["Solar Flare"]} roundTop={false} />
+                    )}
+                  />
+                  <Bar
+                    dataKey="CME"
+                    stackId="events"
+                    barSize={16}
+                    isAnimationActive={false}
+                    shape={(p: object) => <StackSegment {...p} fill={TYPE_COLOR.CME} roundTop={false} />}
+                  />
+                  <Bar
+                    dataKey="Geomagnetic Storm"
+                    stackId="events"
+                    barSize={16}
+                    isAnimationActive={false}
+                    shape={(p: object) => (
+                      <StackSegment {...p} fill={TYPE_COLOR["Geomagnetic Storm"]} roundTop={true} />
+                    )}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
               <p className="muted table-note">
-                Showing the {MAX_FEED_ITEMS} most recent of {totalEvents} events.
+                Flares are ranked by X-ray class (A, B, C, M, X — each letter ten times stronger than the
+                last). Storm levels follow NOAA's G-scale from the Kp index: Kp 5 is G1 (minor) up to Kp 9
+                at G5 (extreme).
               </p>
-            )}
+            </Panel>
+
+            <aside className="wx-side">
+              <Panel
+                className="wx-feed-panel"
+                title="Recent activity"
+                meta={totalEvents > MAX_FEED_ITEMS ? `latest ${MAX_FEED_ITEMS} of ${totalEvents}` : undefined}
+              >
+                <div className="wx-feed-scroll">
+                  <ul className="event-feed wx-feed">
+                    {feed.map((event: SpaceWeatherEvent) => {
+                      const badge = severityBadge(event);
+                      return (
+                        <li key={event.id} className="event-item">
+                          <span className="type-dot" style={{ background: TYPE_COLOR[event.type] }} />
+                          <div className="event-item-body">
+                            <div className="event-item-headline">{event.headline}</div>
+                            <div className="muted event-item-meta">
+                              {event.type} · {formatDateTime(event.time)}
+                            </div>
+                          </div>
+                          {badge && (
+                            <span className={`sev-badge sev-${badge.severity}`}>{badge.label}</span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {feed.length === 0 && (
+                    <p className="muted">No space weather events in this window.</p>
+                  )}
+                </div>
+              </Panel>
+            </aside>
           </div>
         </div>
       )}

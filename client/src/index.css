@@ -1,13 +1,14 @@
 :root {
   color-scheme: dark;
-  /* "Terminal / Mission Ops" look: near-black surfaces, amber accent, sharp
+  /* "Terminal / Mission Ops" look: near-black surfaces, blue accent, sharp
      corners, monospace for headings/labels/data — sans stays for prose. */
   --bg: #0a0a0c;
   --bg-elevated: #141416;
   --border: #2c2c2a;
   --text: #eef1ea;
   --text-muted: #9aa89f;
-  --accent: #eda100;
+  --accent: #3fb4ff; /* brand blue: brackets, links, highlights */
+  --warn: #eda100; /* amber, kept only for "moderate severity" warnings */
   --danger: #ff6b5e;
   --radius: 3px;
   --radius-sm: 2px;
@@ -34,13 +35,21 @@
 
 body {
   margin: 0;
-  background: var(--bg);
   color: var(--text);
   min-height: 100vh;
+  background-color: var(--bg); /* fallback while the image loads */
+  /* The star field, with a 40% dark wash on top so text and charts stay
+     readable. Fixed, so it stays put while the page scrolls. */
+  background-image:
+    linear-gradient(rgba(10, 10, 12, 0.4), rgba(10, 10, 12, 0.4)),
+    url("https://unpkg.com/three-globe/example/img/night-sky.png");
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
 }
 
 .app {
-  max-width: 1100px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 2rem 1.25rem 4rem;
 }
@@ -404,16 +413,57 @@ body {
   }
 }
 
-/* Home globe (landing screen) */
+/* Home globe (landing screen) — the globe fills the whole viewport, with
+   the title and hint floating over it. */
+
+.home-screen {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh; /* accounts for mobile browser toolbars where supported */
+  overflow: hidden;
+}
 
 .home-globe-wrap {
-  height: 520px;
-  width: 100%;
+  position: absolute;
+  inset: 0;
   cursor: grab;
 }
 
 .home-globe-wrap:active {
   cursor: grabbing;
+}
+
+/* Overlays sit above the globe but let drags and clicks pass through. */
+.home-title {
+  position: absolute;
+  top: 1.5rem;
+  left: 1.75rem;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.home-title h1 {
+  font-family: var(--font-mono);
+  font-size: 2rem;
+  margin: 0 0 0.25rem;
+  letter-spacing: 0.02em;
+}
+
+.home-title p {
+  margin: 0;
+}
+
+.home-hint {
+  position: absolute;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  pointer-events: none;
 }
 
 /* Rendered by react-globe.gl into a tooltip div it manages itself, from the
@@ -502,4 +552,936 @@ body {
   100% {
     box-shadow: 0 0 0 10px color-mix(in srgb, var(--status-critical) 0%, transparent);
   }
+}
+
+/* ==========================================================================
+   Polish round — shared chrome (append to the END of index.css)
+   ========================================================================== */
+
+/* Section header: kicker + title on the left, status badge on the right */
+
+.section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.section-head h2 {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin: 0;
+}
+
+.section-kicker {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dot-muted);
+}
+
+.live-badge-success {
+  color: var(--text);
+}
+
+.live-badge-success .live-dot {
+  background: var(--series-3);
+  animation: live-pulse 2s ease-out infinite;
+}
+
+.live-badge-error {
+  color: var(--status-critical);
+}
+
+.live-badge-error .live-dot {
+  background: var(--status-critical);
+}
+
+.live-badge-loading {
+  color: var(--text-muted);
+}
+
+@keyframes live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--series-3) 60%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--series-3) 0%, transparent);
+  }
+}
+
+/* Headline stat strip */
+
+.stat-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 1px;
+  background: var(--border); /* shows through the gaps as hairline dividers */
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+}
+
+.stat-cell {
+  background: var(--bg-elevated);
+  padding: 0.9rem 1.1rem;
+  min-width: 0;
+}
+
+.stat-big {
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.stat-hint {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  margin-top: 0.2rem;
+}
+
+.stat-cell-accent .stat-big {
+  color: var(--accent);
+}
+
+.stat-cell-warn .stat-big {
+  color: var(--warn);
+}
+
+.stat-cell-critical .stat-big {
+  color: var(--status-critical);
+}
+
+.stat-cell-ok .stat-big {
+  color: var(--series-3);
+}
+
+/* Instrument panel: hairline border + amber corner brackets */
+
+.panel {
+  position: relative;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+}
+
+.panel::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  z-index: 2;
+  --c: var(--accent);
+  --l: 12px;
+  --t: 2px;
+  background:
+    linear-gradient(var(--c), var(--c)) top left / var(--l) var(--t),
+    linear-gradient(var(--c), var(--c)) top left / var(--t) var(--l),
+    linear-gradient(var(--c), var(--c)) top right / var(--l) var(--t),
+    linear-gradient(var(--c), var(--c)) top right / var(--t) var(--l),
+    linear-gradient(var(--c), var(--c)) bottom left / var(--l) var(--t),
+    linear-gradient(var(--c), var(--c)) bottom left / var(--t) var(--l),
+    linear-gradient(var(--c), var(--c)) bottom right / var(--l) var(--t),
+    linear-gradient(var(--c), var(--c)) bottom right / var(--t) var(--l);
+  background-repeat: no-repeat;
+}
+
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.panel-title {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.panel-meta {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+}
+
+/* Skeleton loaders */
+
+.skeleton {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--bg-elevated) 25%,
+    color-mix(in srgb, var(--border) 70%, var(--bg-elevated)) 50%,
+    var(--bg-elevated) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-gap {
+  margin-top: 0.5rem;
+}
+
+.skeleton-hero {
+  margin-bottom: 1.25rem;
+}
+
+.apod-text-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .live-badge-success .live-dot {
+    animation: none;
+  }
+}
+
+/* APOD: picture on the left, caption beside it */
+
+.apod-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr);
+  gap: 1.25rem;
+  height: clamp(380px, 68vh, 660px);
+}
+
+.apod-main > * {
+  min-height: 0;
+}
+
+.apod-hero {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+  cursor: zoom-in;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.apod-hero-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s ease;
+}
+
+.apod-hero:hover .apod-hero-img {
+  transform: scale(1.02);
+}
+
+.apod-hero-hint {
+  position: absolute;
+  top: 0.9rem;
+  right: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  background: rgba(10, 10, 12, 0.7);
+  border: 1px solid var(--border);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.apod-hero:hover .apod-hero-hint,
+.apod-hero:focus-visible .apod-hero-hint {
+  opacity: 1;
+}
+
+.apod-hero:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.apod-video-wrap {
+  display: flex;
+  align-items: center;
+  padding: 0;
+  overflow: hidden;
+}
+
+.apod-video-wrap .apod-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: none;
+}
+
+.apod-fallback {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.apod-skeleton-media {
+  height: 100%;
+}
+
+.apod-caption {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  overflow: hidden;
+}
+
+.apod-caption .panel-head {
+  margin-bottom: 0.6rem;
+}
+
+.apod-caption-title {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: clamp(1.1rem, 1.8vw, 1.45rem);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.apod-caption-credit {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  margin-bottom: 0.6rem;
+}
+
+.apod-caption-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+  margin-bottom: 0.9rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.8rem;
+}
+
+.apod-explanation {
+  margin: 0;
+  line-height: 1.7;
+  font-size: 0.93rem;
+}
+
+.apod-hd-link {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.apod-hd-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 900px) {
+  .apod-main {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .apod-hero {
+    height: clamp(260px, 50vh, 480px);
+  }
+
+  .apod-skeleton-media {
+    height: clamp(260px, 50vh, 480px);
+  }
+
+  .apod-caption-scroll {
+    overflow: visible;
+  }
+}
+
+/* Lightbox */
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2.5rem 1rem 1.5rem;
+  background: rgba(5, 5, 7, 0.94);
+  cursor: zoom-out;
+}
+
+.lightbox-img {
+  max-width: 100%;
+  max-height: calc(100vh - 6rem);
+  object-fit: contain;
+  cursor: default;
+}
+
+.lightbox-caption {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-align: center;
+  cursor: default;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.9rem;
+  font-family: var(--font-mono);
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+}
+
+.lightbox-close:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ISS tab (append to the END of index.css) */
+
+.iss-map-panel {
+  padding: 0;
+}
+
+/* The panel supplies the frame and corner brackets now. z-index: 0 makes the
+   map its own stacking context so Leaflet's high-z-index panes can't paint
+   over the brackets. */
+.iss-map-panel .iss-map-wrap {
+  position: relative;
+  z-index: 0;
+  border: none;
+}
+
+.iss-refresh-warning {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+/* NEO radar (append to the END of index.css) */
+
+.neo-radar-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.neo-radar {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+/* Font sizes below are in SVG user units (the viewBox is 600 wide), so they
+   scale with the radar rather than staying a fixed pixel size. */
+
+.neo-spoke {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.neo-ring {
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-opacity: 0.28;
+  stroke-dasharray: 3 5;
+}
+
+.neo-ring-moon {
+  stroke: var(--accent);
+  stroke-opacity: 0.85;
+  stroke-dasharray: 6 4;
+}
+
+.neo-ring-label {
+  fill: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.neo-ring-label-moon {
+  fill: var(--accent);
+}
+
+.neo-day-label {
+  fill: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.neo-earth {
+  stroke: #7fb4f0;
+  stroke-width: 1;
+}
+
+.neo-object {
+  cursor: pointer;
+  outline: none;
+}
+
+.neo-dot {
+  fill: var(--dot-muted);
+  stroke: var(--chart-surface);
+  stroke-width: 1.5;
+}
+
+.neo-dot-hazardous {
+  fill: var(--status-critical);
+}
+
+.neo-halo {
+  fill: none;
+  stroke: var(--status-critical);
+  stroke-opacity: 0.45;
+  stroke-width: 1;
+}
+
+.neo-object-active .neo-dot,
+.neo-object:focus-visible .neo-dot {
+  stroke: var(--text);
+  stroke-width: 2;
+}
+
+.neo-tooltip {
+  position: absolute;
+  width: 220px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.neo-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.25rem;
+  margin-top: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+}
+
+.data-table tbody tr.row-active td {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* NEO side column */
+
+.neo-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 1.5rem;
+  align-items: stretch;
+}
+
+/* The side column is absolutely filled into its grid cell, so its height
+   follows the radar panel instead of making the row taller. The list takes
+   whatever space is left under the stats and scrolls inside it. */
+.neo-side {
+  position: relative;
+  min-width: 0;
+}
+
+.neo-side-inner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 0;
+}
+
+.neo-side-stats .stat-strip {
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 0;
+}
+
+.neo-side-stats .stat-cell {
+  padding: 0.75rem 0.85rem;
+}
+
+.neo-side-stats .stat-big {
+  font-size: 1.15rem;
+}
+
+.neo-side-stats .stat-label {
+  font-size: 0.68rem;
+}
+
+.neo-list-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0.75rem;
+}
+
+.neo-list-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin-right: -0.5rem;
+  padding-right: 0.5rem;
+}
+
+.neo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.neo-list-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 0.1rem;
+  align-items: center;
+  padding: 0.45rem 0.4rem;
+  border-bottom: 1px solid var(--border);
+  cursor: default;
+}
+
+.neo-list-item.row-active {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.neo-list-name {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.neo-list-meta {
+  grid-column: 2;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+/* On narrower screens the columns stack: radar first, then stats and a
+   fixed-height scrolling list. */
+@media (max-width: 960px) {
+  .neo-main {
+    grid-template-columns: 1fr;
+  }
+
+  .neo-side-inner {
+    position: static;
+  }
+
+  .neo-list-panel {
+    max-height: 360px;
+  }
+}
+
+/* Exoplanets polish */
+
+.exo-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.25rem;
+  margin-bottom: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.exo-highlights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem;
+}
+
+.exo-highlight {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.exo-highlight-kicker {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.exo-highlight-name {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.exo-highlight-host {
+  font-size: 0.85rem;
+}
+
+.exo-highlight-value {
+  font-family: var(--font-mono);
+  font-size: 1.7rem;
+  font-weight: 600;
+  color: var(--accent);
+  margin-top: 0.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.exo-highlight-hint {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.exo-highlight-foot {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  margin-top: 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+
+/* Size comparison strip (SVG units scale with the strip's width) */
+
+.size-strip {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.size-baseline {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.size-body-reference {
+  fill: var(--dot-muted);
+  fill-opacity: 0.35;
+  stroke: var(--text-muted);
+  stroke-width: 1;
+}
+
+.size-body-planet {
+  fill: var(--accent);
+  fill-opacity: 0.85;
+  stroke: var(--accent);
+  stroke-width: 1;
+}
+
+.size-body-capped {
+  stroke-dasharray: 5 4;
+  fill-opacity: 0.3;
+}
+
+.size-name {
+  fill: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.size-radius {
+  fill: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.size-note {
+  fill: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+/* Exoplanets layout: use the width instead of one long column */
+
+.exo-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.exo-top-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Beside the timeline the highlight cards stack and tighten up. */
+.exo-top .exo-highlights {
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.exo-top .exo-highlight {
+  padding: 0.9rem 1rem;
+}
+
+.exo-top .exo-highlight-value {
+  font-size: 1.35rem;
+  margin-top: 0.3rem;
+}
+
+.exo-top .exo-highlight-foot {
+  margin-top: 0.5rem;
+  padding-top: 0.45rem;
+}
+
+.exo-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+/* The catalog table scrolls inside its panel (header stays pinned) instead of
+   running 200 rows down the page. */
+.exo-table-wrap {
+  max-height: 420px;
+  overflow: auto;
+}
+
+@media (max-width: 1000px) {
+  .exo-top,
+  .exo-bottom {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .exo-top .exo-highlights {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+}
+
+/* Space weather: chart beside a scrolling feed, severity badges */
+
+.wx-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+/* Same trick as the NEO side column: the feed panel is absolutely filled
+   into its grid cell so its height follows the chart panel, and the list
+   scrolls inside it. */
+.wx-side {
+  position: relative;
+  min-width: 0;
+}
+
+.wx-feed-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0.75rem;
+}
+
+.wx-feed-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin-right: -0.5rem;
+  padding-right: 0.5rem;
+}
+
+/* The panel supplies the frame now; the scroll area handles the height. */
+.wx-feed {
+  border: none;
+  border-radius: 0;
+  max-height: none;
+  overflow: visible;
+}
+
+.sev-badge {
+  margin-left: auto;
+  align-self: flex-start;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.sev-minor {
+  color: var(--text-muted);
+}
+
+.sev-moderate {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.sev-major {
+  color: var(--status-critical);
+  border-color: var(--status-critical);
+  background: color-mix(in srgb, var(--status-critical) 12%, transparent);
+}
+
+@media (max-width: 1000px) {
+  .wx-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wx-feed-panel {
+    position: static;
+    max-height: 480px;
+  }
+}
+
+/* Brand mark next to the Skywatch title */
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.logo {
+  flex-shrink: 0;
+  display: block;
 }
