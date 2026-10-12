@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#0a0a0c"/>
+  <g transform="rotate(-25 32 32)" fill="none" stroke-linecap="round">
+    <!-- back half of the orbit, behind the planet -->
+    <path d="M7 32 A25 10 0 0 1 57 32" stroke="#e8f4ff" stroke-opacity="0.45" stroke-width="3"/>
+    <circle cx="32" cy="32" r="11.5" fill="#3fb4ff" stroke="none"/>
+    <!-- front half, in front of the planet -->
+    <path d="M57 32 A25 10 0 0 1 7 32" stroke="#e8f4ff" stroke-width="3"/>
+    <circle cx="46" cy="39.7" r="4.5" fill="#ffffff" stroke="none"/>
+  </g>
+</svg>

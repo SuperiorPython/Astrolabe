@@ -1,5 +1,5 @@
 {
-  "name": "skywatch",
+  "name": "astrolabe",
   "private": true,
   "version": "0.1.0",
   "description": "Interactive space dashboard built on NASA public APIs (APOD, Exoplanet Archive, DONKI, ISS location, NeoWs).",
