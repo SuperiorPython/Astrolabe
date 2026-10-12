@@ -1,6 +1,6 @@
 # Astrolabe
 
-**Live demo:** [astrolabe.netlify.app](https://astrolabe.netlify.app/)
+**Live demo:** [orbital-astrolabe.netlify.app](https://orbital-astrolabe.netlify.app/)
 
 Astrolabe is an interactive space dashboard built on NASA's public APIs. It
 pulls the day's astronomy picture, the live position of the International
