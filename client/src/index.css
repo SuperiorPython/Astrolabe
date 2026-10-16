@@ -517,6 +517,227 @@ body {
   color: #0a0a0c;
 }
 
+/* Highlighted when its section is hovered in the side menu */
+.globe-pin-label-focus {
+  background: var(--accent);
+  color: #0a0a0c;
+  transform: translate(-50%, -50%) scale(1.12);
+}
+
+/* Landing-screen section menu: hover a row and the globe turns to its pin */
+
+.home-menu.panel {
+  position: absolute;
+  top: 50%;
+  right: 1.75rem;
+  transform: translateY(-50%);
+  z-index: 3;
+  width: min(310px, calc(100vw - 3.5rem));
+  background: color-mix(in srgb, var(--bg-elevated) 82%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.home-menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.home-menu-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-left: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.home-menu-item:hover,
+.home-menu-item:focus-visible,
+.home-menu-item-focus {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  border-left-color: var(--accent);
+  outline: none;
+}
+
+.home-menu-num {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.home-menu-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.home-menu-label {
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+}
+
+.home-menu-desc {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.home-menu-arrow {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.home-menu-item:hover .home-menu-arrow,
+.home-menu-item:focus-visible .home-menu-arrow,
+.home-menu-item-focus .home-menu-arrow {
+  opacity: 1;
+  transform: none;
+}
+
+.home-menu-item-down {
+  border-left-color: var(--status-critical);
+}
+
+.home-menu-item-down .home-menu-desc {
+  color: var(--status-critical);
+}
+
+/* Short landscape screens (phones on their side): keep the side menu compact */
+@media (max-height: 520px) and (min-width: 761px) {
+  .home-menu .panel-head,
+  .home-menu-desc {
+    display: none;
+  }
+
+  .home-menu-item {
+    padding: 0.4rem 0.75rem;
+  }
+}
+
+/* Phones: the menu becomes a swipeable strip of chips along the bottom, and
+   the globe keeps the middle of the screen to itself. */
+@media (max-width: 760px) {
+  .home-title {
+    top: 1rem;
+    left: 1rem;
+    right: 1rem;
+  }
+
+  .home-title h1 {
+    font-size: 1.5rem;
+  }
+
+  .home-title p {
+    font-size: 0.8rem;
+    max-width: 34ch;
+  }
+
+  .home-menu.panel {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: calc(2.6rem + env(safe-area-inset-bottom, 0px));
+    transform: none;
+    width: auto;
+    padding: 0.25rem 0;
+    background: transparent;
+    border: none;
+    backdrop-filter: none;
+  }
+
+  .home-menu.panel::before,
+  .home-menu .panel-head,
+  .home-menu-num,
+  .home-menu-desc {
+    display: none;
+  }
+
+  .home-menu-list {
+    flex-direction: row;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding: 0.25rem 1rem;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    touch-action: pan-x;
+  }
+
+  .home-menu-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .home-menu-list li {
+    flex: 0 0 auto;
+    scroll-snap-align: center;
+  }
+
+  .home-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: auto;
+    padding: 0.6rem 0.9rem;
+    white-space: nowrap;
+    background: color-mix(in srgb, var(--bg-elevated) 88%, transparent);
+    border: 1px solid var(--border);
+  }
+
+  .home-menu-item:hover {
+    /* Sticky hover after a tap would otherwise look like a selection. */
+    background: color-mix(in srgb, var(--bg-elevated) 88%, transparent);
+    border-color: var(--border);
+  }
+
+  .home-menu-item-focus,
+  .home-menu-item-focus:hover {
+    background: color-mix(in srgb, var(--accent) 18%, var(--bg-elevated));
+    border-color: var(--accent);
+  }
+
+  .home-menu-item-down {
+    border-color: var(--status-critical);
+  }
+
+  .home-hint {
+    bottom: calc(0.9rem + env(safe-area-inset-bottom, 0px));
+    width: calc(100% - 2rem);
+    text-align: center;
+    font-size: 0.7rem;
+  }
+}
+
+/* Hint wording follows the device: hover vs tap */
+.hint-touch {
+  display: none;
+}
+
+@media (hover: none) {
+  .hint-hover {
+    display: none;
+  }
+
+  .hint-touch {
+    display: inline;
+  }
+}
+
 /* Shown in a tab whose feed failed its health check */
 
 .feature-unavailable {
