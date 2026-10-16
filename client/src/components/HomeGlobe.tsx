@@ -50,6 +50,20 @@ interface HomeGlobeProps {
 // Camera travel time when the globe turns to a hovered section.
 const FOCUS_MS = 900;
 
+// Camera distance above the surface, in globe radii. The library's default
+// (2.5) frames the globe well on a landscape screen, but on a tall, narrow
+// one (a phone held upright) it makes the globe wider than the viewport and
+// the user has to pinch out. So the camera backs off as the screen gets
+// narrower: FRAME_WIDTH is how many globe radii we want visible across the
+// screen's width (the globe itself is 2 across, plus room for its labels).
+const DEFAULT_ALTITUDE = 2.5;
+const FRAME_WIDTH = 2.86;
+
+function fitAltitude(width: number, height: number): number {
+  if (width <= 0 || height <= 0) return DEFAULT_ALTITUDE;
+  return Math.max(DEFAULT_ALTITUDE, FRAME_WIDTH / (width / height) - 1);
+}
+
 export function HomeGlobe({ onSelect, status, focusKey = null }: HomeGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // See the top-of-file note: `any` because I can't resolve the library's
@@ -73,6 +87,26 @@ export function HomeGlobe({ onSelect, status, focusKey = null }: HomeGlobeProps)
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+
+  // Frame the globe for this screen's shape, keeping wherever it's pointing.
+  // Runs once the globe is up and again only if the screen flips between
+  // portrait and landscape — never on ordinary resizes, so it doesn't undo
+  // a zoom the user has chosen.
+  const sizeRef = useRef(size);
+  sizeRef.current = size;
+  const portrait = size.width < size.height;
+  const frameGlobe = () => {
+    const globe = globeRef.current;
+    if (!globe) return;
+    const { lat, lng } = globe.pointOfView();
+    const { width, height } = sizeRef.current;
+    globe.pointOfView({ lat, lng, altitude: fitAltitude(width, height) }, 0);
+  };
+  useEffect(() => {
+    if (ready) frameGlobe();
+    // frameGlobe only reads refs, so it isn't a dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, portrait]);
 
   useEffect(() => {
     // Gentle idle rotation so the landing screen doesn't sit dead-still;
@@ -145,6 +179,7 @@ export function HomeGlobe({ onSelect, status, focusKey = null }: HomeGlobeProps)
       {ready && (
         <Globe
           ref={globeRef}
+          onGlobeReady={frameGlobe}
           width={size.width}
           height={size.height}
           backgroundColor="rgba(0,0,0,0)"
