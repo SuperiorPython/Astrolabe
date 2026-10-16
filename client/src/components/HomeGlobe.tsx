@@ -43,9 +43,14 @@ type FeedPoint = FeedMeta & { size: number; color: string };
 interface HomeGlobeProps {
   onSelect: (key: FeedKey) => void;
   status: Record<FeedKey, FeedStatus>;
+  /** The section hovered in the side menu: the globe turns to face it. */
+  focusKey?: FeedKey | null;
 }
 
-export function HomeGlobe({ onSelect, status }: HomeGlobeProps) {
+// Camera travel time when the globe turns to a hovered section.
+const FOCUS_MS = 900;
+
+export function HomeGlobe({ onSelect, status, focusKey = null }: HomeGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // See the top-of-file note: `any` because I can't resolve the library's
   // real ref-method type (GlobeMethods or similar) without installing it.
@@ -77,6 +82,38 @@ export function HomeGlobe({ onSelect, status }: HomeGlobeProps) {
     controls.autoRotate = true;
     controls.autoRotateSpeed = 0.6;
   }, [ready]);
+
+  // Read by the label factory below so a label created while a section is
+  // already focused starts out highlighted.
+  const focusRef = useRef<FeedKey | null>(focusKey);
+  focusRef.current = focusKey;
+
+  // Hovering a section in the side menu: pause the idle spin and swing the
+  // camera round to that pin (keeping the user's current zoom). When the
+  // pointer leaves the menu, the idle spin resumes from wherever it landed.
+  useEffect(() => {
+    const globe = globeRef.current;
+    const controls = globe?.controls?.();
+    if (!globe || !controls) return;
+
+    if (focusKey) {
+      const feed = FEEDS.find((f) => f.key === focusKey);
+      if (feed) {
+        controls.autoRotate = false;
+        const { altitude } = globe.pointOfView();
+        globe.pointOfView({ lat: feed.lat, lng: feed.lng, altitude }, FOCUS_MS);
+      }
+    } else {
+      controls.autoRotate = true;
+    }
+  }, [focusKey, ready]);
+
+  // Highlight the matching floating label on the globe.
+  useEffect(() => {
+    containerRef.current
+      ?.querySelectorAll<HTMLElement>(".globe-pin-label")
+      .forEach((el) => el.classList.toggle("globe-pin-label-focus", el.dataset.feed === focusKey));
+  }, [focusKey, ready]);
 
   const feedPoints = useMemo<FeedPoint[]>(
     () =>
@@ -157,7 +194,10 @@ export function HomeGlobe({ onSelect, status }: HomeGlobeProps) {
             const feed = d as FeedPoint;
             const down = status[feed.key] === "down";
             const el = document.createElement("div");
-            el.className = `globe-pin-label${down ? " globe-pin-label-down" : ""}`;
+            el.className = `globe-pin-label${down ? " globe-pin-label-down" : ""}${
+              focusRef.current === feed.key ? " globe-pin-label-focus" : ""
+            }`;
+            el.dataset.feed = feed.key;
             el.textContent = feed.navLabel;
             el.style.pointerEvents = "auto";
             el.addEventListener("click", (evt) => {
