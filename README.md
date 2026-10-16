@@ -1,91 +1,71 @@
-# Skywatch
+# Astrolabe
 
-**Live demo:** [orbital-skywatch.netlify.app](https://orbital-skywatch.netlify.app/)
+**Live demo:** [orbital-astrolabe.netlify.app](https://orbital-astrolabe.netlify.app/)
 
-An interactive space dashboard built on NASA's public APIs, with a React +
-TypeScript frontend (not another Streamlit app) and a small Express backend
-that proxies and caches NASA API calls.
+Astrolabe is an interactive space dashboard built on NASA's public APIs. It
+pulls the day's astronomy picture, the live position of the International
+Space Station, nearby asteroids, the full exoplanet catalog, and recent solar
+activity into a single console-style interface, starting from a full-screen
+interactive 3D globe that doubles as the navigation menu.
 
-## Sections
+It is a custom React + TypeScript frontend backed by a small Express API that
+proxies and caches the NASA endpoints, so the dashboard stays responsive and
+inside the API rate limits.
 
-- **APOD** — Astronomy Picture of the Day, hero section
-- **Exoplanets** — filterable/sortable table + scatter plot from the NASA
-  Exoplanet Archive (distance, radius, discovery method/year)
-- **Space weather (DONKI)** — timeline of recent solar flares, CMEs, and
-  geomagnetic storms
-- **ISS tracker** — live map of the ISS's current position
-- **Near-Earth objects (NeoWs)** — upcoming asteroid close approaches,
-  sortable by size/distance/date
+## Features
 
-## Project layout
+### Home globe
+A full-screen, draggable 3D globe with floating labels for each section.
+Pick a destination from the globe to open its tab. The rest of the app sits on
+a fixed night-sky background with a shared blue "instrument panel" look:
+bracketed panels, stat strips, and status badges (LIVE, DAILY, CATALOG) that
+show how fresh each feed is.
 
-```
-skywatch/
-  client/   Vite + React + TypeScript frontend
-  server/   Express + TypeScript backend (NASA API proxy + cache)
-```
+### Astronomy Picture of the Day
+Today's APOD with the picture on the left and its caption beside it: title,
+date, credit, and the full explanation in a scrollable panel. Click the image
+for a full-screen viewer, or jump to the full-resolution file. Video days
+are handled too.
 
-## Deploying to Netlify
+### ISS tracker
+The station's live position on a map, updated continuously, with its recent
+ground track and a footprint circle showing the area that can currently see
+it. Telemetry shows altitude, velocity, and whether the station is in
+daylight, visible from the ground, or in Earth's shadow. If the primary data
+source is unavailable, the tracker falls back to a secondary one that
+provides position only.
 
-Netlify hosts the built frontend as a static site and runs the Express
-backend as a single serverless function (`netlify/functions/api.ts`, wired
-up via `netlify.toml`) — no separate server to manage. The client's `/api/...`
-fetches work unchanged in production; Netlify redirects them to the
-function.
+### Near-Earth objects
+Upcoming asteroid close approaches drawn as a radar centered on Earth.
+Distance is on a logarithmic scale measured in lunar distances, each approach
+day gets its own wedge, and each dot is sized by the asteroid's estimated
+diameter, with potentially hazardous objects flagged. A scrollable side list
+and summary stats sit beside the radar, sortable by size, distance, or date.
 
-1. Push this repo to GitHub if it isn't already there.
-2. On [netlify.com](https://app.netlify.com), **Add new site → Import an
-   existing project**, and pick this repo. Netlify reads `netlify.toml`
-   automatically, so the build command and publish directory are already
-   set — you shouldn't need to type anything into those fields.
-3. Before the first deploy (or right after, then redeploy), add your NASA
-   key: **Site configuration → Environment variables → Add a variable** →
-   name `NASA_API_KEY`, value your real key. This is separate from both
-   `server/.env` and the `NASA_API_KEY` GitHub Actions secret — all three
-   are independent copies of the same key.
-4. Deploy. Netlify gives you a `https://<something>.netlify.app` URL —
-   open it and the whole dashboard should work. (This project's own
-   deploy lives at
-   [orbital-skywatch.netlify.app](https://orbital-skywatch.netlify.app/).)
+### Exoplanets
+The whole NASA Exoplanet Archive catalog at a glance: a discovery timeline
+broken down by year and detection method, highlight cards for the closest,
+largest, and smallest known planets, a strip comparing planet sizes, and a
+filterable, sortable table with a scatter plot of distance versus radius.
 
-Prefer a one-off deploy without connecting GitHub at all? The
-[Netlify CLI](https://docs.netlify.com/cli/get-started/) supports that
-too: `npm install -g netlify-cli`, then `netlify deploy --prod` from the
-repo root (after `netlify login` and `netlify init`).
+### Space weather
+Recent solar flares, coronal mass ejections, and geomagnetic storms from
+NASA's DONKI database. Events are ranked by severity: flares by X/M/C class,
+storms on the NOAA G-scale derived from the Kp index. Headline stats
+summarize the period and a timeline shows what happened when.
 
-A couple of things that are different in this deployment vs. local dev:
-the in-memory response cache (`server/src/lib/cache.ts`) only survives
-between requests when Netlify happens to reuse a "warm" function
-container — a cold start clears it, so don't be surprised by an
-occasional slower first load. And `CLIENT_ORIGIN` (used for CORS
-locally) doesn't need to be set on Netlify, since the frontend and the
-function are served from the same domain there.
+## How it works
 
-## CI: weekly NASA API key health check
-
-`.github/workflows/nasa-key-health.yml` hits `api.nasa.gov` every Monday and
-fails the run (which GitHub emails you about by default) if the key is
-missing, invalid, or rate-limited — catching a dead key before you go to
-demo this instead of during. It can also be triggered manually from the
-Actions tab.
-
-To enable it, add your NASA API key as a repository secret named
-`NASA_API_KEY`: repo **Settings → Secrets and variables → Actions → New
-repository secret**. This is separate from `server/.env` — the workflow
-never reads your local `.env` file.
-
-You can run the same check locally (reads `server/.env`):
-
-```bash
-npm run check:nasa-key
-```
-
-## Notes
-
-- The backend caches each NASA endpoint response in memory for a short TTL
-  so the dashboard doesn't burn through the rate limit on every page
-  refresh (see `server/src/lib/cache.ts`).
-- The ISS tracker resets its trail whenever the gap between two readings is
-  much larger than the poll interval (e.g. the tab was backgrounded and the
-  browser throttled its timer) instead of drawing a straight line across the
-  globe between two unrelated positions.
+- **Frontend:** React 18, TypeScript, and Vite. A shared set of components
+  (panels, stat strips, skeleton loaders, section headers) keeps the five
+  tabs consistent, and every feed shows a loading skeleton, an error state,
+  and a last-updated time.
+- **Backend:** Express + TypeScript. Each NASA endpoint is wrapped, trimmed
+  to the fields the UI needs, and cached in memory for a short time so page
+  refreshes don't burn through the rate limit.
+- **Data sources:** NASA APOD, NeoWs, DONKI, and the Exoplanet Archive,
+  plus a public ISS position feed.
+- **Hosting:** the client is served as a static site and the Express app runs
+  as a single Netlify serverless function.
+- **CI:** a scheduled GitHub Actions workflow checks the NASA API key weekly,
+  so a dead or rate-limited key is caught before a demo rather than during one.
